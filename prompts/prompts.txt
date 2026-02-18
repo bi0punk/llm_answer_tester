@@ -1,0 +1,4 @@
+# Un prompt por línea
+¿Qué es TTFT y por qué importa en serving de LLM?
+Dame un script bash para rotar logs diarios con retención 7 días.
+Explica diferencia entre TCP y UDP en 5 líneas.

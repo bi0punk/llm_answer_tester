@@ -1,0 +1,54 @@
+services:
+  llama:
+    build: ./llama
+    container_name: llama
+    ports:
+      - "8000:8000"
+    environment:
+      # Put your GGUF at ./models/model.gguf (or change MODEL_PATH below)
+      MODEL_PATH: /models/model.gguf
+      ALIAS: qwen25
+      PORT: 8000
+      CTX: 8192
+      THREADS: -1
+      GPU_LAYERS: 0
+    volumes:
+      - ./models:/models:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()" || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: ./api
+    container_name: bench-api
+    ports:
+      - "8080:8080"
+    environment:
+      DB_PATH: /data/bench.db
+      RESULTS_JSONL: /data/results.jsonl
+      LLM_BASE_URL: http://llama:8000/v1
+      LLM_MODEL: qwen25
+      LLM_TIMEOUT_S: 180
+      DEFAULT_TEMPERATURE: 0.2
+      DEFAULT_MAX_TOKENS: 256
+      DEFAULT_STREAM: "true"
+      # Optional: bounded queue size (protect RAM)
+      MAX_QUEUE_SIZE: 1000
+      # Optional: worker concurrency (1 = strictly sequential)
+      WORKERS: 1
+    volumes:
+      - ./data:/data
+    depends_on:
+      llama:
+        condition: service_healthy
+
+  client:
+    build: ./client
+    container_name: bench-client
+    depends_on:
+      - api
+    volumes:
+      - ./prompts:/prompts:ro
+    command: ["--server", "http://api:8080", "--prompts", "/prompts/prompts.txt", "--stream"]
