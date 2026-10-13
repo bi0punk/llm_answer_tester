@@ -1,10 +1,12 @@
-import aiosqlite
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional, List
+from typing import Any
+
+import aiosqlite
+
 
 def now_utc_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -51,7 +53,8 @@ class DB:
     async def create_run(self, run_id: str, total: int, model: str, params_json: str):
         async with aiosqlite.connect(self.path) as con:
             await con.execute(
-                "INSERT INTO runs(run_id, created_utc, total, done, ok, errors, model, params_json) VALUES (?,?,?,?,?,?,?,?)",
+                "INSERT INTO runs(run_id, created_utc, total, done, ok, errors, model, params_json) "
+                "VALUES (?,?,?,?,?,?,?,?)",
                 (run_id, now_utc_iso(), total, 0, 0, 0, model, params_json),
             )
             await con.commit()
@@ -71,11 +74,11 @@ class DB:
         prompt: str,
         response: str,
         ok: bool,
-        error: Optional[str],
-        status_code: Optional[int],
+        error: str | None,
+        status_code: int | None,
         latency_ms: float,
-        ttft_ms: Optional[float],
-        usage_json: Optional[str],
+        ttft_ms: float | None,
+        usage_json: str | None,
     ):
         async with aiosqlite.connect(self.path) as con:
             await con.execute(
@@ -102,14 +105,14 @@ class DB:
 
             await con.commit()
 
-    async def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+    async def get_run(self, run_id: str) -> dict[str, Any] | None:
         async with aiosqlite.connect(self.path) as con:
             con.row_factory = aiosqlite.Row
             cur = await con.execute("SELECT * FROM runs WHERE run_id=?", (run_id,))
             row = await cur.fetchone()
             return dict(row) if row else None
 
-    async def get_results(self, run_id: str, limit: int = 1000) -> List[Dict[str, Any]]:
+    async def get_results(self, run_id: str, limit: int = 1000) -> list[dict[str, Any]]:
         async with aiosqlite.connect(self.path) as con:
             con.row_factory = aiosqlite.Row
             cur = await con.execute(

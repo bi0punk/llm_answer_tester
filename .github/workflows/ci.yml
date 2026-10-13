@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - run: uv pip install --system ruff
+      - run: ruff check api client --select E,F,I,B,SIM,UP --line-length 120
+
+  api-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+      - run: uv pip install --system -r api/requirements.txt
+      - run: uv run --with python-dotenv python -c "import sys; sys.path.insert(0,'api'); sys.path.insert(0,'client'); import app, db, llm, client"

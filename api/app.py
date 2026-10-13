@@ -3,13 +3,12 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from typing import Any
 
 from db import DB
+from fastapi import FastAPI, HTTPException
 from llm import chat_completion
+from pydantic import BaseModel, Field
 
 DB_PATH = os.getenv("DB_PATH", "/data/bench.db")
 RESULTS_JSONL = os.getenv("RESULTS_JSONL", "/data/results.jsonl")
@@ -25,24 +24,24 @@ DEFAULT_STREAM = os.getenv("DEFAULT_STREAM", "true").lower() in ("1", "true", "y
 MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE", "1000"))
 WORKERS = int(os.getenv("WORKERS", "1"))
 
-queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue(maxsize=MAX_QUEUE_SIZE)
+queue: "asyncio.Queue[dict[str, Any]]" = asyncio.Queue(maxsize=MAX_QUEUE_SIZE)
 db = DB(DB_PATH)
 
 app = FastAPI(title="bench-api", version="0.1")
 
 class BatchReq(BaseModel):
-    run_id: Optional[str] = None
-    prompts: List[str] = Field(min_length=1)
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
-    stream: Optional[bool] = None
-    sleep_s: Optional[float] = 0.0
+    run_id: str | None = None
+    prompts: list[str] = Field(min_length=1)
+    temperature: float | None = None
+    max_tokens: int | None = None
+    stream: bool | None = None
+    sleep_s: float | None = 0.0
 
 class AskReq(BaseModel):
     prompt: str
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
-    stream: Optional[bool] = None
+    temperature: float | None = None
+    max_tokens: int | None = None
+    stream: bool | None = None
 
 @app.on_event("startup")
 async def startup():
@@ -107,8 +106,16 @@ async def batch(req: BatchReq):
     stream = req.stream if req.stream is not None else DEFAULT_STREAM
     sleep_s = float(req.sleep_s or 0.0)
 
-    params = {"temperature": float(temperature), "max_tokens": int(max_tokens), "stream": bool(stream), "sleep_s": sleep_s}
-    await db.create_run(run_id=run_id, total=len(req.prompts), model=LLM_MODEL, params_json=json.dumps(params, ensure_ascii=False))
+    params = {
+        "temperature": float(temperature),
+        "max_tokens": int(max_tokens),
+        "stream": bool(stream),
+        "sleep_s": sleep_s,
+    }
+    await db.create_run(
+        run_id=run_id, total=len(req.prompts), model=LLM_MODEL,
+        params_json=json.dumps(params, ensure_ascii=False),
+    )
 
     for i, p in enumerate(req.prompts, start=1):
         await queue.put({"run_id": run_id, "idx": i, "prompt": p, "params": params})
@@ -130,7 +137,7 @@ async def run_results(run_id: str, limit: int = 1000):
     results = await db.get_results(run_id, limit=limit)
     return {"run": r, "results": results}
 
-def _append_jsonl(run_id: str, idx: int, prompt: str, res: Any, params: Dict[str, Any]):
+def _append_jsonl(run_id: str, idx: int, prompt: str, res: Any, params: dict[str, Any]):
     row = {
         "run_id": run_id,
         "idx": idx,

@@ -1,19 +1,20 @@
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
+
 
 @dataclass
 class LLMResp:
     ok: bool
     text: str
     latency_ms: float
-    ttft_ms: Optional[float]
-    status_code: Optional[int]
-    error: Optional[str]
-    usage: Optional[Dict[str, Any]]
+    ttft_ms: float | None
+    status_code: int | None
+    error: str | None
+    usage: dict[str, Any] | None
 
 async def chat_completion(
     base_url_v1: str,
@@ -38,7 +39,7 @@ async def chat_completion(
     status_code = None
     ttft_ms = None
     usage = None
-    parts: List[str] = []
+    parts: list[str] = []
 
     try:
         async with httpx.AsyncClient(timeout=timeout_s) as client:
